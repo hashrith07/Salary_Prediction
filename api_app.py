@@ -6,10 +6,8 @@ import os
 
 app = FastAPI(
     title="Salary Prediction API",
-    description="Predicts salary using ML model with real-world constraints",
-    version="5.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc"     
+    description="Predicts salary using ML model with realistic validation",
+    version="6.0.0"
 )
 
 # -----------------------------------------------------
@@ -51,6 +49,37 @@ class SalaryInput(BaseModel):
 
 
 # -----------------------------------------------------
+# Normalization Functions
+# -----------------------------------------------------
+
+def normalize(text: str):
+    return text.lower().strip()
+
+
+def normalize_job_title(title: str):
+
+    title = normalize(title)
+
+    replacements = {
+        "backend developer": "Back end Developer",
+        "backend engineer": "Back end Developer",
+        "back-end developer": "Back end Developer",
+        "frontend developer": "Front end Developer",
+        "data science": "Data Scientist"
+    }
+
+    if title in replacements:
+        return replacements[title]
+
+    # fallback to original format if already correct
+    for known in JOB_ENCODER.classes_:
+        if normalize(known) == title:
+            return known
+
+    return None
+
+
+# -----------------------------------------------------
 # Real World Validation Rules
 # -----------------------------------------------------
 
@@ -59,25 +88,24 @@ def validate_constraints(data: SalaryInput):
     errors = []
 
     # Age vs Experience
-    if data.years_of_experience > (data.age - 18):
-        errors.append("Years of experience cannot exceed age - 18.")
+    if data.years_of_experience > (data.age - 16):
+        errors.append("Experience cannot exceed realistic working years.")
 
-    # Education vs age
-    if data.education_level == "Bachelor's" and data.age < 20:
-        errors.append("Bachelor's degree holders are usually at least 20.")
+    # Education vs age (more flexible)
 
-    if data.education_level == "Master's" and data.age < 22:
-        errors.append("Master's degree holders are usually at least 22.")
+    if data.education_level == "Master's" and data.age < 21:
+        errors.append("Master's students are usually ≥21.")
 
-    if data.education_level == "PhD" and data.age < 25:
-        errors.append("PhD holders are usually at least 25.")
+    if data.education_level == "PhD" and data.age < 23:
+        errors.append("PhD candidates are usually ≥23.")
 
-    # Role rules
+    # Role constraints
+
     if "Manager" in data.job_title and data.years_of_experience < 5:
         errors.append("Manager roles usually require ≥5 years experience.")
 
-    if "Senior" in data.job_title and data.years_of_experience < 4:
-        errors.append("Senior roles usually require ≥4 years experience.")
+    if "Senior" in data.job_title and data.years_of_experience < 3:
+        errors.append("Senior roles usually require ≥3 years experience.")
 
     if "Intern" in data.job_title and data.years_of_experience > 1:
         errors.append("Intern roles cannot have more than 1 year experience.")
@@ -96,24 +124,27 @@ async def predict(data: SalaryInput):
 
         errors = []
 
-        # Category validation
+        # Normalize inputs
+        gender = data.gender.strip()
+        education = data.education_level.strip()
 
-        if data.gender not in GENDER_ENCODER.classes_:
+        job_title = normalize_job_title(data.job_title)
+
+        if job_title is None:
             errors.append(
-                f"Invalid gender '{data.gender}'. Allowed: {list(GENDER_ENCODER.classes_)}"
+                f"Unknown job title '{data.job_title}'. Example: {list(JOB_ENCODER.classes_)[:8]}"
             )
 
-        if data.education_level not in EDU_ENCODER.classes_:
+        if gender not in GENDER_ENCODER.classes_:
             errors.append(
-                f"Invalid education level '{data.education_level}'. Allowed: {list(EDU_ENCODER.classes_)}"
+                f"Invalid gender '{gender}'. Allowed: {list(GENDER_ENCODER.classes_)}"
             )
 
-        if data.job_title not in JOB_ENCODER.classes_:
+        if education not in EDU_ENCODER.classes_:
             errors.append(
-                f"Invalid job title '{data.job_title}'. Example allowed: {list(JOB_ENCODER.classes_)[:10]}"
+                f"Invalid education level '{education}'. Allowed: {list(EDU_ENCODER.classes_)}"
             )
 
-        # Real-world rules
         errors.extend(validate_constraints(data))
 
         if errors:
@@ -121,9 +152,9 @@ async def predict(data: SalaryInput):
 
         # Encode inputs
 
-        gender_encoded = int(GENDER_ENCODER.transform([data.gender])[0])
-        edu_encoded = int(EDU_ENCODER.transform([data.education_level])[0])
-        job_encoded = int(JOB_ENCODER.transform([data.job_title])[0])
+        gender_encoded = int(GENDER_ENCODER.transform([gender])[0])
+        edu_encoded = int(EDU_ENCODER.transform([education])[0])
+        job_encoded = int(JOB_ENCODER.transform([job_title])[0])
 
         row = {
             "Age": float(data.age),
@@ -135,28 +166,23 @@ async def predict(data: SalaryInput):
 
         df = pd.DataFrame([row])
 
-        # -----------------------------------------------------
-        # Model Prediction (original dataset is US-based)
-        # -----------------------------------------------------
+        # Model prediction
 
         usd_salary = float(model.predict(df)[0])
 
-        # Safety bounds for US salary
+        # Bound unrealistic values
         usd_salary = max(30000, min(usd_salary, 200000))
 
-        # -----------------------------------------------------
-        # Adjust to Indian market
-        # -----------------------------------------------------
-
-        # Approx scaling (India salaries ~20% of US tech salaries)
+        # Convert to Indian market estimate
         indian_salary_usd = usd_salary * 0.2
 
         usd_to_inr = 83
 
         indian_salary_inr = indian_salary_usd * usd_to_inr
-        monthly_inr = indian_salary_inr / 12
 
-        # Prediction uncertainty
+        monthly_salary = indian_salary_inr / 12
+
+        # Uncertainty range
         margin = indian_salary_inr * 0.15
 
         return {
@@ -165,16 +191,16 @@ async def predict(data: SalaryInput):
                 round(indian_salary_inr, 2),
 
             "predicted_salary_india_monthly_inr":
-                round(monthly_inr, 2),
+                round(monthly_salary, 2),
 
             "salary_range_inr":
                 [
-                    round(indian_salary_inr - margin, 2),
+                    round(max(0, indian_salary_inr - margin), 2),
                     round(indian_salary_inr + margin, 2)
                 ],
 
             "note":
-                "Prediction adjusted for Indian tech market using scaling from US dataset"
+                "Prediction estimated for Indian market using scaled US dataset"
 
         }
 
@@ -186,7 +212,7 @@ async def predict(data: SalaryInput):
 
 
 # -----------------------------------------------------
-# Get Valid Categories
+# Category Endpoints
 # -----------------------------------------------------
 
 @app.get("/valid-values")
@@ -201,10 +227,6 @@ async def valid_values():
         "job_titles": JOB_ENCODER.classes_.tolist()
     }
 
-
-# -----------------------------------------------------
-# For Streamlit Compatibility
-# -----------------------------------------------------
 
 @app.get("/categories")
 async def categories():
