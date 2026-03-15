@@ -7,7 +7,9 @@ import os
 app = FastAPI(
     title="Salary Prediction API",
     description="Predicts salary using ML model with real-world constraints",
-    version="5.0.0"
+    version="5.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc"     
 )
 
 # -----------------------------------------------------
