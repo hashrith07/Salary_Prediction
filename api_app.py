@@ -1,6 +1,5 @@
 from fastapi import FastAPI, HTTPException
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import joblib
 import pandas as pd
@@ -10,6 +9,14 @@ app = FastAPI(
     title="Salary Prediction API",
     description="Predicts salary using ML model with realistic calibration",
     version="7.1.0"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # -----------------------------------------------------
@@ -247,10 +254,3 @@ async def health():
         "status": "healthy",
         "model_loaded": model is not None
     }
-
-
-@app.get("/")
-async def serve_index():
-    return FileResponse(os.path.join(MODEL_DIR, "frontend", "index.html"))
-
-app.mount("/", StaticFiles(directory=os.path.join(MODEL_DIR, "frontend")), name="frontend")
