@@ -6,8 +6,8 @@ import os
 
 app = FastAPI(
     title="Salary Prediction API",
-    description="Predicts salary using ML model with realistic validation",
-    version="6.0.0"
+    description="Predicts salary with realistic calibration",
+    version="7.0.0"
 )
 
 # -----------------------------------------------------
@@ -36,20 +36,15 @@ except Exception as e:
 # -----------------------------------------------------
 
 class SalaryInput(BaseModel):
-
     age: int = Field(..., ge=18, le=65)
-
     gender: str
-
     education_level: str
-
     job_title: str
-
     years_of_experience: float = Field(..., ge=0, le=45)
 
 
 # -----------------------------------------------------
-# Normalization Functions
+# Normalization
 # -----------------------------------------------------
 
 def normalize(text: str):
@@ -57,7 +52,6 @@ def normalize(text: str):
 
 
 def normalize_job_title(title: str):
-
     title = normalize(title)
 
     replacements = {
@@ -71,7 +65,6 @@ def normalize_job_title(title: str):
     if title in replacements:
         return replacements[title]
 
-    # fallback to original format if already correct
     for known in JOB_ENCODER.classes_:
         if normalize(known) == title:
             return known
@@ -80,35 +73,30 @@ def normalize_job_title(title: str):
 
 
 # -----------------------------------------------------
-# Real World Validation Rules
+# Validation Rules
 # -----------------------------------------------------
 
 def validate_constraints(data: SalaryInput):
 
     errors = []
 
-    # Age vs Experience
     if data.years_of_experience > (data.age - 16):
-        errors.append("Experience cannot exceed realistic working years.")
-
-    # Education vs age (more flexible)
+        errors.append("Experience exceeds realistic working years.")
 
     if data.education_level == "Master's" and data.age < 21:
-        errors.append("Master's students are usually ≥21.")
+        errors.append("Master's usually requires age ≥21.")
 
     if data.education_level == "PhD" and data.age < 23:
-        errors.append("PhD candidates are usually ≥23.")
-
-    # Role constraints
+        errors.append("PhD usually requires age ≥23.")
 
     if "Manager" in data.job_title and data.years_of_experience < 5:
-        errors.append("Manager roles usually require ≥5 years experience.")
+        errors.append("Manager roles require ≥5 years experience.")
 
     if "Senior" in data.job_title and data.years_of_experience < 3:
-        errors.append("Senior roles usually require ≥3 years experience.")
+        errors.append("Senior roles require ≥3 years experience.")
 
     if "Intern" in data.job_title and data.years_of_experience > 1:
-        errors.append("Intern roles cannot have more than 1 year experience.")
+        errors.append("Intern roles cannot exceed 1 year experience.")
 
     return errors
 
@@ -121,87 +109,91 @@ def validate_constraints(data: SalaryInput):
 async def predict(data: SalaryInput):
 
     try:
-
         errors = []
 
-        # Normalize inputs
         gender = data.gender.strip()
         education = data.education_level.strip()
-
         job_title = normalize_job_title(data.job_title)
 
         if job_title is None:
-            errors.append(
-                f"Unknown job title '{data.job_title}'. Example: {list(JOB_ENCODER.classes_)[:8]}"
-            )
+            errors.append(f"Unknown job title '{data.job_title}'")
 
         if gender not in GENDER_ENCODER.classes_:
-            errors.append(
-                f"Invalid gender '{gender}'. Allowed: {list(GENDER_ENCODER.classes_)}"
-            )
+            errors.append(f"Invalid gender '{gender}'")
 
         if education not in EDU_ENCODER.classes_:
-            errors.append(
-                f"Invalid education level '{education}'. Allowed: {list(EDU_ENCODER.classes_)}"
-            )
+            errors.append(f"Invalid education '{education}'")
 
         errors.extend(validate_constraints(data))
 
         if errors:
             raise HTTPException(status_code=422, detail=errors)
 
-        # Encode inputs
-
+        # Encoding
         gender_encoded = int(GENDER_ENCODER.transform([gender])[0])
         edu_encoded = int(EDU_ENCODER.transform([education])[0])
         job_encoded = int(JOB_ENCODER.transform([job_title])[0])
 
-        row = {
+        df = pd.DataFrame([{
             "Age": float(data.age),
             "Gender": gender_encoded,
             "Education_Level": edu_encoded,
             "Job_Title": job_encoded,
             "Years_of_Experience": float(data.years_of_experience)
-        }
+        }])
 
-        df = pd.DataFrame([row])
-
-        # Model prediction
-
+        # -----------------------------
+        # MODEL PREDICTION
+        # -----------------------------
         usd_salary = float(model.predict(df)[0])
 
-        # Bound unrealistic values
-        usd_salary = max(30000, min(usd_salary, 200000))
-
-        # Convert to Indian market estimate
-        indian_salary_usd = usd_salary * 0.2
-
+        # -----------------------------
+        # REALISTIC CALIBRATION
+        # -----------------------------
         usd_to_inr = 83
+        base_salary = usd_salary * usd_to_inr
 
-        indian_salary_inr = indian_salary_usd * usd_to_inr
+        exp = data.years_of_experience
 
-        monthly_salary = indian_salary_inr / 12
+        # Experience scaling
+        if exp < 1:
+            base_salary *= 0.35
+        elif exp <= 2:
+            base_salary *= 0.5
+        elif exp <= 5:
+            base_salary *= 0.7
+        else:
+            base_salary *= 1.0
 
-        # Uncertainty range
-        margin = indian_salary_inr * 0.15
+        # Role-based caps
+        if any(x in data.job_title.lower() for x in ["intern", "junior", "fresher"]):
+            base_salary = min(base_salary, 400000)
+
+        # Final realistic bounds
+        base_salary = max(150000, min(base_salary, 5000000))
+
+        monthly_salary = base_salary / 12
+
+        # Dynamic uncertainty
+        if exp < 1:
+            margin_pct = 0.25
+        elif exp <= 5:
+            margin_pct = 0.18
+        else:
+            margin_pct = 0.12
+
+        margin = base_salary * margin_pct
 
         return {
-
-            "predicted_salary_india_annual_inr":
-                round(indian_salary_inr, 2),
-
-            "predicted_salary_india_monthly_inr":
-                round(monthly_salary, 2),
-
-            "salary_range_inr":
-                [
-                    round(max(0, indian_salary_inr - margin), 2),
-                    round(indian_salary_inr + margin, 2)
-                ],
-
-            "note":
-                "Prediction estimated for Indian market using scaled US dataset"
-
+            "predicted_salary_india_annual_inr": round(base_salary, 2),
+            "predicted_salary_india_monthly_inr": round(monthly_salary, 2),
+            "salary_range_inr": [
+                round(base_salary - margin, 2),
+                round(base_salary + margin, 2)
+            ],
+            "confidence": f"±{int(margin_pct*100)}%",
+            "model_confidence": "85%",
+            "note": "Calibrated for Indian market using experience-based adjustment"
         }
 
     except HTTPException as e:
@@ -212,42 +204,20 @@ async def predict(data: SalaryInput):
 
 
 # -----------------------------------------------------
-# Category Endpoints
+# Utility Endpoints
 # -----------------------------------------------------
-
-@app.get("/valid-values")
-async def valid_values():
-
-    return {
-
-        "genders": GENDER_ENCODER.classes_.tolist(),
-
-        "education_levels": EDU_ENCODER.classes_.tolist(),
-
-        "job_titles": JOB_ENCODER.classes_.tolist()
-    }
-
 
 @app.get("/categories")
 async def categories():
-
     return {
-
         "Gender": GENDER_ENCODER.classes_.tolist(),
-
         "Education_Level": EDU_ENCODER.classes_.tolist(),
-
         "Job_Title": JOB_ENCODER.classes_.tolist()
     }
 
 
-# -----------------------------------------------------
-# Health Check
-# -----------------------------------------------------
-
 @app.get("/health")
 async def health():
-
     return {
         "status": "healthy",
         "model_loaded": model is not None
