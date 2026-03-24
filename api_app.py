@@ -6,8 +6,8 @@ import os
 
 app = FastAPI(
     title="Salary Prediction API",
-    description="Predicts salary with realistic calibration",
-    version="7.0.0"
+    description="Predicts salary using ML model with realistic calibration",
+    version="7.1.0"
 )
 
 # -----------------------------------------------------
@@ -73,7 +73,7 @@ def normalize_job_title(title: str):
 
 
 # -----------------------------------------------------
-# Validation Rules
+# Validation
 # -----------------------------------------------------
 
 def validate_constraints(data: SalaryInput):
@@ -81,7 +81,7 @@ def validate_constraints(data: SalaryInput):
     errors = []
 
     if data.years_of_experience > (data.age - 16):
-        errors.append("Experience exceeds realistic working years.")
+        errors.append("Experience cannot exceed realistic working years.")
 
     if data.education_level == "Master's" and data.age < 21:
         errors.append("Master's usually requires age ≥21.")
@@ -109,6 +109,7 @@ def validate_constraints(data: SalaryInput):
 async def predict(data: SalaryInput):
 
     try:
+
         errors = []
 
         gender = data.gender.strip()
@@ -142,58 +143,80 @@ async def predict(data: SalaryInput):
             "Years_of_Experience": float(data.years_of_experience)
         }])
 
-        # -----------------------------
+        # -----------------------------------------------------
         # MODEL PREDICTION
-        # -----------------------------
-        usd_salary = float(model.predict(df)[0])
+        # -----------------------------------------------------
 
-        # -----------------------------
-        # REALISTIC CALIBRATION
-        # -----------------------------
+        usd_salary = float(model.predict(df)[0])
+        usd_salary = max(30000, min(usd_salary, 200000))
+
+        # -----------------------------------------------------
+        # CALIBRATION (REALISTIC FIX)
+        # -----------------------------------------------------
+
         usd_to_inr = 83
-        base_salary = usd_salary * usd_to_inr
+        indian_salary_inr = usd_salary * 0.2 * usd_to_inr
 
         exp = data.years_of_experience
+        job = data.job_title.lower()
 
-        # Experience scaling
+        # Experience correction
         if exp < 1:
-            base_salary *= 0.35
-        elif exp <= 2:
-            base_salary *= 0.5
-        elif exp <= 5:
-            base_salary *= 0.7
-        else:
-            base_salary *= 1.0
+            indian_salary_inr *= 0.4
+        elif exp < 3:
+            indian_salary_inr *= 0.6
+        elif exp < 5:
+            indian_salary_inr *= 0.75
 
-        # Role-based caps
-        if any(x in data.job_title.lower() for x in ["intern", "junior", "fresher"]):
-            base_salary = min(base_salary, 400000)
+        # Role correction
+        if "intern" in job:
+            indian_salary_inr = min(indian_salary_inr, 300000)
 
-        # Final realistic bounds
-        base_salary = max(150000, min(base_salary, 5000000))
+        elif "junior" in job or "fresher" in job:
+            indian_salary_inr = min(indian_salary_inr, 500000)
 
-        monthly_salary = base_salary / 12
+        elif "senior" in job and exp < 5:
+            indian_salary_inr *= 0.8
+
+        # Final bounds
+        indian_salary_inr = max(150000, min(indian_salary_inr, 5000000))
+
+        monthly_salary = indian_salary_inr / 12
 
         # Dynamic uncertainty
         if exp < 1:
             margin_pct = 0.25
-        elif exp <= 5:
+        elif exp < 5:
             margin_pct = 0.18
         else:
             margin_pct = 0.12
 
-        margin = base_salary * margin_pct
+        margin = indian_salary_inr * margin_pct
+
+        # -----------------------------------------------------
+        # FINAL CLEAN RESPONSE
+        # -----------------------------------------------------
 
         return {
-            "predicted_salary_india_annual_inr": round(base_salary, 2),
-            "predicted_salary_india_monthly_inr": round(monthly_salary, 2),
-            "salary_range_inr": [
-                round(base_salary - margin, 2),
-                round(base_salary + margin, 2)
+
+            "estimated_annual_salary_lpa":
+                round(indian_salary_inr / 100000, 2),
+
+            "estimated_monthly_salary_inr":
+                round(monthly_salary, 0),
+
+            "salary_range_lpa": [
+                round((indian_salary_inr - margin) / 100000, 2),
+                round((indian_salary_inr + margin) / 100000, 2)
             ],
+
             "confidence": f"±{int(margin_pct*100)}%",
             "model_confidence": "85%",
-            "note": "Calibrated for Indian market using experience-based adjustment"
+
+            "currency": "INR",
+
+            "note": "Calibrated for Indian market using experience-based adjustment",
+            "version": "SalaryIQ v7.1"
         }
 
     except HTTPException as e:
