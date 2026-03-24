@@ -1,4 +1,4 @@
-const API_BASE = '/api/salary';
+const API_BASE = "https://your-render-url.onrender.com";
 
 function spawnParticles() {
   const container = document.getElementById('particles');
