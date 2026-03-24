@@ -1,4 +1,4 @@
-const API_BASE = 'https://Salary_Prediction-m55r.onrender.com';
+const API_BASE = 'https://salary-prediction-m55r.onrender.com';
 
 function spawnParticles() {
   const container = document.getElementById('particles');
