@@ -1,4 +1,6 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 import joblib
 import pandas as pd
@@ -199,15 +201,15 @@ async def predict(data: SalaryInput):
 
         return {
 
-            "estimated_annual_salary_lpa":
-                round(indian_salary_inr / 100000, 2),
+            "predicted_salary_india_annual_inr":
+                round(indian_salary_inr, 2),
 
-            "estimated_monthly_salary_inr":
+            "predicted_salary_india_monthly_inr":
                 round(monthly_salary, 0),
 
-            "salary_range_lpa": [
-                round((indian_salary_inr - margin) / 100000, 2),
-                round((indian_salary_inr + margin) / 100000, 2)
+            "salary_range_inr": [
+                round(indian_salary_inr - margin, 2),
+                round(indian_salary_inr + margin, 2)
             ],
 
             "confidence": f"±{int(margin_pct*100)}%",
@@ -245,3 +247,10 @@ async def health():
         "status": "healthy",
         "model_loaded": model is not None
     }
+
+
+@app.get("/")
+async def serve_index():
+    return FileResponse(os.path.join(MODEL_DIR, "frontend", "index.html"))
+
+app.mount("/", StaticFiles(directory=os.path.join(MODEL_DIR, "frontend")), name="frontend")
