@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SalaryIQ · ML Salary Intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="bg-mesh"></div>
+  <div class="particles" id="particles"></div>
+  <div class="page">
+    <nav>
+      <div class="logo">SalaryIQ</div>
+      <div class="badge">
+        <span class="pulse-ring"></span>
+        ML Intelligence · India
+      </div>
+    </nav>
+    <div class="hero">
+      <div class="eyebrow">
+        <span class="eyebrow-line"></span>
+        <span class="eyebrow-text">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;margin-right:6px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          Real-time Salary Intelligence
+        </span>
+      </div>
+      <h1>Discover Your<br><span class="grad-word">True Worth</span></h1>
+      <p class="hero-sub">Power your career decisions with ML-driven salary insights calibrated for the Indian technology market. Get your estimate in seconds.</p>
+      <div class="stats-row">
+        <div class="stat"><span class="stat-val">50K+</span><span class="stat-label">Data Points</span></div>
+        <div class="stat-divider"></div>
+        <div class="stat"><span class="stat-val">200+</span><span class="stat-label">Job Roles</span></div>
+        <div class="stat-divider"></div>
+        <div class="stat"><span class="stat-val">95%</span><span class="stat-label">Accuracy</span></div>
+      </div>
+    </div>
+    <div class="form-card">
+      <div class="section-label"><span>Your Profile</span><span class="section-num">01</span></div>
+      <div id="init-loader">
+        <div class="loader-bar"><div class="loader-fill"></div></div>
+        <div class="loader-text">Loading data…</div>
+      </div>
+      <form id="predict-form" style="display:none;">
+        <div class="grid-2">
+          <div class="field"><label for="age">Age</label><input type="number" id="age" name="age" min="18" max="65" value="28" required></div>
+          <div class="field"><label for="gender">Gender</label><select id="gender" name="gender" required></select></div>
+        </div>
+        <div class="field"><label for="education">Education Level</label><select id="education" name="education" required></select></div>
+        <div class="field"><label for="job-title">Job Title</label><select id="job-title" name="job_title" required></select></div>
+        <div class="field">
+          <div class="slider-header">
+            <label for="experience">Years of Experience</label>
+            <span class="slider-val" id="exp-val">3.0 yrs</span>
+          </div>
+          <input type="range" id="experience" name="years_of_experience" min="0" max="45" step="0.5" value="3">
+        </div>
+        <button type="submit" class="btn-predict" id="predict-btn">⚡ &nbsp; Calculate My Salary</button>
+      </form>
+    </div>
+    <div class="loader" id="predict-loader">
+      <div class="loader-bar"><div class="loader-fill"></div></div>
+      <div class="loader-text">Crunching numbers…</div>
+    </div>
+    <div class="error-box" id="error-box"><p id="error-msg"></p></div>
+    <div class="result-card" id="result-card">
+      <div class="res-eyebrow">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        Estimated Annual Salary
+        <span class="res-eyebrow-line"></span>
+      </div>
+      <div class="res-annual" id="res-annual">—<span class="res-annual-unit">per year</span></div>
+      <div class="res-row"><span class="res-label">Monthly Estimate</span><span class="res-val" id="res-monthly">—</span></div>
+      <div class="res-row" style="border-bottom:none;">
+        <span class="res-label">Salary Range</span>
+        <span class="res-range"><span id="res-low">—</span><span class="range-dash">—</span><span id="res-high">—</span></span>
+      </div>
+      <div class="profile-grid">
+        <div class="profile-cell"><div class="pcell-label">Role</div><div class="pcell-val" id="p-role">—</div></div>
+        <div class="profile-cell"><div class="pcell-label">Experience</div><div class="pcell-val" id="p-exp">—</div></div>
+        <div class="profile-cell"><div class="pcell-label">Education</div><div class="pcell-val" id="p-edu">—</div></div>
+        <div class="profile-cell"><div class="pcell-label">Confidence</div><div class="pcell-val">± 15%</div></div>
+      </div>
+      <div class="conf-section">
+        <div class="conf-header"><span>Model Confidence</span><span>85%</span></div>
+        <div class="conf-track"><div class="conf-fill" id="conf-fill"></div></div>
+      </div>
+      <div class="res-note" id="res-note">Estimates based on aggregated market data · Results may vary by location and company stage</div>
+    </div>
+    <footer>
+      <span class="foot-copy">© 2025 SalaryIQ · Model v5.0</span>
+      <span class="foot-status"><span class="status-dot"></span>Indian Market · FastAPI + HTML/JS</span>
+    </footer>
+  </div>
+  <script src="/script.js"></script>
+</body>
+</html>
