@@ -51,7 +51,9 @@ Salary_Prediction
 │   └── main.py
 │
 ├── frontend/
-│   └── streamlit_app.py
+│   └── index.html
+    └── style.css
+    └── script.js   
 │
 └── notebooks/
     └── salary_prediction.ipynb
@@ -75,11 +77,7 @@ http://127.0.0.1:8000
 
 ---
 
-### 2️⃣ Start Streamlit frontend
-
-```bash
-streamlit run streamlit_app.py
-```
+### 2️⃣ Start frontend HTML,CSS,JAVASCRIPT
 
 App will open at:
 
@@ -103,6 +101,7 @@ Output
 ```
 Predicted Salary Range:
 ₹7,00,000 – ₹9,00,000 per year
+also predicts salary per month
 ```
 
 ---
