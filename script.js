@@ -1,4 +1,6 @@
-const API_BASE = "https://salary-prediction-k6nv.onrender.com";
+const API_BASE = (window.location.origin && window.location.origin.includes('onrender.com'))
+  ? ''
+  : 'https://salary-prediction-k6nv.onrender.com';
 
 const FALLBACK_CATEGORIES = {
   "Gender": ["Female", "Male", "Other"],

@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import joblib
@@ -254,3 +255,31 @@ async def health():
         "status": "healthy",
         "model_loaded": model is not None
     }
+
+
+# -----------------------------------------------------
+# Full-Stack Frontend Routes (Unified Deployment)
+# -----------------------------------------------------
+
+@app.get("/", include_in_schema=False)
+async def serve_home():
+    index_file = os.path.join(MODEL_DIR, "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file, media_type="text/html")
+    return {"status": "online", "message": "Salary Prediction API is running"}
+
+
+@app.get("/style.css", include_in_schema=False)
+async def serve_css():
+    css_file = os.path.join(MODEL_DIR, "style.css")
+    if os.path.exists(css_file):
+        return FileResponse(css_file, media_type="text/css")
+    raise HTTPException(status_code=404, detail="File not found")
+
+
+@app.get("/script.js", include_in_schema=False)
+async def serve_js():
+    js_file = os.path.join(MODEL_DIR, "script.js")
+    if os.path.exists(js_file):
+        return FileResponse(js_file, media_type="application/javascript")
+    raise HTTPException(status_code=404, detail="File not found")
